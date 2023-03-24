@@ -1,33 +1,43 @@
 #root {
-  max-width: 1280px;
   margin: 0 auto;
-  padding: 1rem 0 0.2rem 0;
-  text-align: center;
+  width: 100%;
 }
 
-.App{
+.App {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  padding-bottom: 0.2em;
-  will-change: filter;
+body {
+  background-color: white;
+}
+.webchatContainer {
+  max-height: 95vh;
+  width: 480px;
+  margin: auto;
+  flex-grow: 1;
+}
+.webchatContainer div {
+  height: 100%;
 }
 
-.logo.botpress{
-  fill:black
-}
-.logo.botpress:hover {
-  filter: drop-shadow(0 0 2em #898989d5);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.webchatIframe {
+  position: relative !important;
 }
 
-.read-the-docs {
-  color: #888;
+@media only screen and (orientation: portrait) {
+  .webchatContainer {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
+}
+
+@media screen and (orientation: landscape) and (max-width: 900px) {
+  .webchatContainer {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
 }

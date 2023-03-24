@@ -1,102 +1,94 @@
-import "./webchat.css";
-
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 
 interface Props {
-  botpressHost: string;
-  botID: string;
+  botID: string
 }
 
-const INJECTION_ID = "bp-webchat-injection";
-const INJECTION_URL = "assets/modules/channel-web/inject.js";
-const WEBCHAT_ID = "botpress-webchat";
-const WRAPPER_ID = `${WEBCHAT_ID}-wrapper`;
-let intervalId: ReturnType<typeof setInterval>;
+const INJECTION_ID = "bp-webchat-injection"
+const WEBCHAT_ID = "botpress-webchat"
+const WRAPPER_ID = `${WEBCHAT_ID}-wrapper`
 
 const EmbeddedWebchat = (props: Props) => {
-  const [webchatLoaded, setWebchatLoaded] = useState(false);
-  const [webchatReady, setWebchatReady] = useState(false);
+  const [injectScriptLoaded, setWebchatLoaded] = useState(false)
+  const [webchatReady, setWebchatReady] = useState(false)
 
-  const loadWebchat = () => {
-    // Ensure the webchat is only added once to the page
-    if (document.getElementById(INJECTION_ID)) {
-      return;
+  const loadWebchatScript = (): Promise<Webchat> => {
+    if (window.botpressWebChat) {
+      return Promise.resolve(window.botpressWebChat)
     }
-
-    const script = window.document.createElement("script");
-    script.src = `${props.botpressHost}/${INJECTION_URL}`;
-    script.id = INJECTION_ID;
-    window.document.body.appendChild(script);
-
-    intervalId = setInterval(() => {
-      // Once added, the webchat takes some time before being ready to initialize
-      if (window.botpressWebChat) {
-        setWebchatLoaded(true);
-        clearInterval(intervalId);
-      }
-    }, 500);
-  };
-
-  const webchatEventListener = (message: MessageEvent) => {
-    if (message.data.chatId !== WEBCHAT_ID) {
-      return;
+    if (!window.document.getElementById(INJECTION_ID)) {
+      const script = window.document.createElement("script")
+      script.src = `https://cdn.botpress.dev/webchat/v0/inject.js`
+      script.id = INJECTION_ID
+      window.document.body.appendChild(script)
     }
-
-    if (message.data.name === "webchatLoaded") {
-      // window.botpressWebChat.sendEvent(
-      //   { type: "loadConversation", conversationId: Date.now().toString() },
-      //   WEBCHAT_ID
-      // );
-      const contentWindow = (
-        document.querySelector(`#${WRAPPER_ID} iframe`) as HTMLIFrameElement
-      )?.contentWindow;
-      contentWindow?.postMessage({ action: "new-session" }, "*");
-      window.botpressWebChat.sendEvent({ type: "show" }, WEBCHAT_ID);
-    } else if (message.data.name === "webchatReady") {
-      setWebchatReady(true);
-    }
-  };
+    const loadPromise = new Promise<Webchat>((resolve) => {
+      const intervalId = setInterval(() => {
+        if (window.botpressWebChat) {
+          setWebchatLoaded(true)
+          clearInterval(intervalId)
+          resolve(window.botpressWebChat)
+        }
+      }, 100)
+    })
+    return loadPromise
+  }
 
   useEffect(() => {
-    loadWebchat();
-
-    window.addEventListener("message", webchatEventListener);
-    return () => window.removeEventListener("message", webchatEventListener);
-  }, []);
+    loadWebchatScript().then((webchat: Webchat) => {
+      webchat.onEvent(
+        (event: WebchatEvent) => {
+          if (event.type === "LIFECYCLE.LOADED") {
+            setWebchatReady(true)
+            window.botpressWebChat.sendEvent({ type: "show" }, WEBCHAT_ID)
+          }
+        },
+        ["LIFECYCLE.LOADED", "LIFECYCLE.LOADED"],
+        WEBCHAT_ID
+      )
+    })
+  }, [])
 
   useEffect(() => {
-    if (!webchatLoaded) {
-      return;
+    if (!injectScriptLoaded) {
+      return
     }
-
+    if (import.meta.env.DEV && webchatReady) {
+      document.querySelector(`#${WRAPPER_ID}>div`)?.remove()
+    }
     const webchatConfig = {
-      host: props.botpressHost,
       botId: props.botID,
+      clientId: props.botID,
+      hostUrl: "https://cdn.botpress.dev/webchat/v0",
+      messagingUrl: "https://messaging.botpress.dev",
+      stylesheet: `${window.location.origin}/webchat-stylesheet.css`,
       showConversationsButton: false,
-      enableReset: false,
-      chatId: WEBCHAT_ID,
       hideWidget: true,
       disableAnimations: true,
       className: "webchatIframe",
-      showPoweredBy: false,
-      showUserAvatar: false,
-      enableResetSessionShortcut: false,
+      showPoweredBy: true,
       enableTranscriptDownload: false,
-      enableConversationDeletion: false,
-      stylesheet: `${window.location.origin}/webchat-stylesheet.css`,
+      showCloseButton: false,
       closeOnEscape: false,
-      containerWidth: "100%",
-      layoutWidth: "100%",
-    };
+      containerWidth: encodeURIComponent("100%"),
+      layoutWidth: encodeURIComponent("100%"),
+      // These 3 should use real bot info
+      botName: "anonymized",
+      botConversationDescription:
+        "Chat with this bot built surprisingly fast in Botpress",
+      composerPlaceholder: `Chat with Bot NAME`, // TODO replace with bot name from static file
+      // remove this when we have a real bot
+      chatId: WEBCHAT_ID,
+    }
 
-    window.botpressWebChat.init(webchatConfig, `#${WRAPPER_ID}`);
-  }, [webchatLoaded]);
+    window.botpressWebChat.init(webchatConfig, `#${WRAPPER_ID}`)
+  }, [injectScriptLoaded])
 
   return (
     <div id={WRAPPER_ID} className="webchatContainer">
       {!webchatReady && <div>loading</div>}
     </div>
-  );
-};
+  )
+}
 
-export default EmbeddedWebchat;
+export default EmbeddedWebchat
